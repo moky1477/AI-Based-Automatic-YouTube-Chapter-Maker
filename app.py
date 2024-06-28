@@ -1,21 +1,16 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from sklearn.decomposition import NMF, LatentDirichletAllocation
-import streamlit as st
+import os
 import re
-import csv
-from googleapiclient.discovery import build
+from flask import Flask, request, jsonify, render_template
 from youtube_transcript_api import YouTubeTranscriptApi
 from dotenv import load_dotenv
 import google.generativeai as genai 
-import os
 
 load_dotenv()
 
 # Configure the Google Generative AI
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+app = Flask(__name__)
 
 # Prompt for the generative AI
 prompt = """
@@ -35,9 +30,7 @@ Chapter 2: 02:00 - Title
 Each chapter should be on a new line.
 """
 
-# API_KEY = os.getenv('API KEY')
-
-# Extract the video_id from the given URL
+# Function to extract the video_id from the given URL
 def get_video_id(url):
     video_id_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
     return video_id_match.group(1) if video_id_match else None
@@ -59,8 +52,7 @@ def extract_transcript_details(video_id):
             transcript += f"{timestamp}\n{item['text']}\n"
         return transcript
     except Exception as e:
-        st.error(f"Error: {e}")
-        return None
+        return str(e)
 
 # Function to generate the summary based on Prompt from Google Gemini Pro
 def generate_gemini_content(transcript, prompt):
@@ -68,31 +60,27 @@ def generate_gemini_content(transcript, prompt):
     response = model.generate_content(prompt + transcript)
     return response.text
 
-# Streamlit UI
-st.title('Automatic YouTube Chapter Maker')
-youtube_link = st.text_input("Enter YouTube Video Link:")
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-if youtube_link:
-    video_id = get_video_id(youtube_link)
-    if video_id:
-        st.image(f"http://img.youtube.com/vi/{video_id}/0.jpg", use_column_width=True)
-        # st.write(get_video_title(video_id))
-    else:
-        st.error("Invalid YouTube URL")
-
-if st.button("Make Chapters"):
+@app.route('/make_chapters', methods=['POST'])
+def make_chapters():
+    youtube_link = request.form.get('youtube_link')
     if youtube_link:
         video_id = get_video_id(youtube_link)
         if video_id:
             transcript_text = extract_transcript_details(video_id)
             if transcript_text:
                 summary = generate_gemini_content(transcript_text, prompt)
-                st.markdown("## Detailed Chapters:")
-                for line in summary.splitlines():
-                    st.write(line)
+                chapters = summary.splitlines()
+                return jsonify({'chapters': chapters})
             else:
-                st.error("Could not retrieve transcript")
+                return jsonify({'error': 'Could not retrieve transcript'})
         else:
-            st.error("Invalid YouTube URL")
+            return jsonify({'error': 'Invalid YouTube URL'})
     else:
-        st.error("Please enter a YouTube link")
+        return jsonify({'error': 'Please enter a YouTube link'})
+
+if __name__ == '__main__':
+    app.run(debug=True)

@@ -5,7 +5,7 @@ from googleapiclient.discovery import build
 import streamlit as st
 from youtube_transcript_api import YouTubeTranscriptApi
 
-API_KEY = 'AIzaSyDaSH0H2Xmyx-kJQscP4i0H38Vh18CDksE'
+API_KEY = 'GOOGLE_API_KEY'
 
 # Extract the video_id from the given URL
 def get_video_id(url):
